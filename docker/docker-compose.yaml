@@ -1,0 +1,75 @@
+version: '3.8'
+services:
+  hoppscotch-frontend:
+    image: hoppscotch/hoppscotch-frontend:latest
+    ports:
+      - "10.11.0.2:3000:3000"
+    depends_on:
+      - hoppscotch-backend
+    environment:
+      VITE_BASE_URL: "http://ly-local-hoppscotch:3000"
+      VITE_BACKEND_API_URL: "http://hoppscotch-backend:3170/v1"
+      VITE_BACKEND_GQL_URL: "http://hoppscotch-backend:3170/graphql"
+      VITE_BACKEND_WS_URL: "ws://hoppscotch-backend:3170/graphql"
+    networks:
+      - ly_hoppscotch_network
+
+  hoppscotch-backend:
+    image: hoppscotch/hoppscotch-backend:latest
+    ports:
+      - "3170:3170"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: "postgresql://{{ op://DevOp/ly_hoppscotch_db/username }}:{{ op://DevOp/ly_hoppscotch_db/password }}@db:5432/{{ op://DevOp/ly_hoppscotch_db/dbname }}"
+      JWT_SECRET: "{{ op://DevOp/ly_hoppscotch_internal/jwt_secret }}"
+      TOKEN_SALT_COMPLEXITY: "10"
+      MAGIC_LINK_TOKEN_VALIDITY: "3"
+      REFRESH_TOKEN_VALIDITY: "604800000"
+      ACCESS_TOKEN_VALIDITY: "86400000"
+      SESSION_SECRET: "{{ op://DevOp/ly_hoppscotch_internal/session_secret }}"
+      REDIRECT_URL: "http://ly-local-hoppscotch:3000"
+      WHITELISTED_ORIGINS: "http://localhost:3170,http://ly-local-hoppscotch:3000,http://ly-local-hoppscotch:3100"
+      VITE_ALLOWED_AUTH_PROVIDERS: "MICROSOFT"
+      MICROSOFT_CLIENT_ID: "{{ op://DevOp/ly_hoppscotch_azure_app/client_id }}"
+      MICROSOFT_CLIENT_SECRET: "{{ op://DevOp/ly_hoppscotch_azure_app/password }}"
+      MICROSOFT_CALLBACK_URL: "http://localhost:3170/v1/auth/microsoft/callback"
+      MICROSOFT_SCOPE: "user.read"
+      MICROSOFT_TENANT: "common"
+      MAILER_SMTP_URL: "smtps://info@lysid.com:pass@smtp.lysid.com"
+      MAILER_ADDRESS_FROM: "info@lysid.com"
+      RATE_LIMIT_TTL: "60"
+      RATE_LIMIT_MAX: "100"
+    # entrypoint: "pnpx prisma migrate deploy"
+    networks:
+      - ly_hoppscotch_network
+
+  hoppscotch-admin:
+    image: hoppscotch/hoppscotch-admin:latest
+    ports:
+      - "10.11.0.2:3100:80"
+    depends_on:
+      - hoppscotch-backend
+    environment:
+      VITE_ADMIN_URL: "http://ly-local-hoppscotch:3100"
+      VITE_BACKEND_API_URL: "http://hoppscotch-backend:3170/v1"
+    networks:
+      - ly_hoppscotch_network
+
+  db:
+    image: postgres
+    ports:
+      - "10.11.0.2:5432:5432"
+    environment:
+      POSTGRES_USER: {{ op://DevOp/ly_hoppscotch_db/username }}
+      POSTGRES_PASSWORD: {{ op://DevOp/ly_hoppscotch_db/password }}
+      POSTGRES_DB: {{ op://DevOp/ly_hoppscotch_db/dbname }}
+    volumes:
+      - ./data/ly_hoppscotch_db:/var/lib/postgresql/data
+      - ./data/ly_hoppscotch_db:/backup
+    networks:
+      - ly_hoppscotch_network
+
+networks:
+  ly_hoppscotch_network:
+    driver: bridge
